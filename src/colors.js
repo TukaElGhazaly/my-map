@@ -27,3 +27,33 @@ export const useLabel = (use) => use.replaceAll('_', ' ')
 
 // One accent in three shades: 5, 10 and 15 minutes.
 export const REACH_COLORS = ['#b23a1d', '#e2703f', '#f3b291']
+
+// Buildings renovated by the fund: outline and label.
+export const RENOVATED_COLOR = '#1d5c3f'
+
+// The thinking roof: plants, uses, windows, and the heat overlay from blue (held in) to red (escaping).
+export const ROOF_COLORS = {
+  bare: '#9b9a95',
+  thin: '#9fbb7a',
+  dense: '#5e8d45',
+  terrace: '#b89068',
+  path: '#ddd5c6',
+  bench: '#6e4a2c',
+  locked: '#1d4d2a',
+  plantDark: '#3f6e33',
+  plantLight: '#7fae5a',
+  drawing: '#b23a1d',
+  glowWarm: '#ffb347',
+  glowCold: '#6fa3d8',
+  glowCool: '#fff1d6',
+  glowHot: '#ff5a36',
+}
+
+const HEAT_STOPS = ['#2f6db5', '#f2efe8', '#c0392b']
+export function heatColor(t) {
+  const x = Math.max(0, Math.min(1, t)) * 2
+  const i = Math.min(1, Math.floor(x))
+  const a = HEAT_STOPS[i], b = HEAT_STOPS[i + 1], f = x - i
+  const ch = (h, k) => parseInt(h.slice(1 + 2 * k, 3 + 2 * k), 16)
+  return `#${[0, 1, 2].map((k) => Math.round(ch(a, k) + (ch(b, k) - ch(a, k)) * f).toString(16).padStart(2, '0')).join('')}`
+}

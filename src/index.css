@@ -371,3 +371,134 @@ th {
     max-height: 50vh;
   }
 }
+
+.fund {
+  border-top: 1px solid #e5e2db;
+  padding-top: 4px;
+  margin-bottom: 8px;
+}
+
+.fund h3 {
+  margin-top: 6px;
+}
+
+.fund .budget {
+  float: right;
+  font-weight: 600;
+  color: #1d5c3f;
+}
+
+.fund-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.fund-log li {
+  padding: 5px 0 5px 8px;
+  border-left: 3px solid #cfcac0;
+  margin-bottom: 4px;
+}
+
+.fund-log li.renovate {
+  border-left-color: #1d5c3f;
+}
+
+.fund-log li.rejected,
+.fund-log li.error {
+  border-left-color: #b42318;
+}
+
+.fund-when {
+  color: #666;
+  font-size: 11px;
+}
+
+.fund-did {
+  font-weight: 600;
+}
+
+.swatch.outline {
+  background: transparent;
+  border-width: 2px;
+}
+
+/* The thinking roof */
+.roof-clock {
+  border-top: 1px solid #e5e2db;
+  border-bottom: 1px solid #e5e2db;
+  padding: 6px 0 2px;
+  margin-bottom: 8px;
+}
+
+.roof-clock .hint {
+  margin: 2px 0 4px;
+}
+
+button.link {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d5c3f;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.link:disabled {
+  color: #aaa;
+  cursor: default;
+}
+
+td.over {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.roof-quote {
+  font-style: italic;
+  color: #1c1c1c;
+}
+
+.roof-bar {
+  width: 130px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  font-size: 11px;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.roof-bar-name {
+  font-weight: 600;
+}
+
+.roof-bar-track {
+  height: 6px;
+  margin: 2px 0;
+  border-radius: 3px;
+  background: #e5e2db;
+  overflow: hidden;
+}
+
+.roof-bar-fill {
+  height: 100%;
+  transition: width 0.4s, background 0.4s;
+}
+
+.roof-says {
+  width: 220px;
+  padding: 6px 9px;
+  border-radius: 10px 10px 10px 2px;
+  background: #1d4d2a;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}

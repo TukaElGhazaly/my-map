@@ -1,7 +1,8 @@
 // The energy view: what the buildings are coloured by, the energy balance of the
 // clicked building or the whole area as a flow diagram, and how it is worked out.
 import Sankey, { formatEnergy } from './Sankey.jsx'
-import { useLabel } from './colors.js'
+import { useLabel, RENOVATED_COLOR } from './colors.js'
+import { BUDGET } from './fund.js'
 import {
   STANDARDS, CLASSES, classOf, MIN_HEATED_HEIGHT_M, WINDOW_SHARE, KWH_PER_W_PER_K, GROUND_FACTOR,
   AIR_CHANGES_PER_H, INTERNAL_GAINS_KWH_M2, WINDOW_G, GAIN_USE,
@@ -103,7 +104,59 @@ function flows(balance) {
   }
 }
 
-export function EnergyPanel({ data, envelopes, balances, total, standard, setStandard, metric, setMetric, selected, setSelected, bauhaus }) {
+const time = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+const ACTIONS = {
+  renovate: (e) => `Renovated building ${e.id}${e.saved ? `, saving ${formatEnergy(e.saved)} a season` : ''}`,
+  wait: () => 'Waited',
+  rejected: () => 'Rejected: not on its list',
+  error: () => 'Couldn’t think',
+}
+
+// The renovation fund: its budget, and a log of what it noticed, did and why.
+function Fund({ fund }) {
+  const { left, log, busy, offline, renovations } = fund
+  const saved = renovations.reduce((s, r) => s + r.saved, 0)
+  return (
+    <div className="fund">
+      <h3>
+        Weimar renovation fund
+        <span className="budget">
+          {left} of {BUDGET} renovations left
+        </span>
+      </h3>
+      {renovations.length > 0 && <p className="hint">Saving {formatEnergy(saved)} of heating a season so far.</p>}
+      {offline ? (
+        <p className="hint">The fund only thinks on localhost: run the app with npm run dev to let it decide.</p>
+      ) : left <= 0 ? (
+        <p className="hint">The budget is used up. The fund has stopped thinking.</p>
+      ) : (
+        <p className="hint">
+          {busy
+            ? 'The fund is thinking…'
+            : 'It thinks when you click a building, and once a minute by itself while this view is open.'}
+        </p>
+      )}
+      {log.length > 0 && (
+        <ol className="fund-log">
+          {log.map((e, k) => (
+            <li key={log.length - k} className={e.action}>
+              <div className="fund-when">
+                {time(e.time)} · {e.trigger}
+              </div>
+              {e.noticed && <div>Noticed: {e.noticed}</div>}
+              <div className="fund-did">{ACTIONS[e.action](e)}</div>
+              {e.reason && <div>Why: {e.reason}</div>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
+
+export function EnergyPanel({ data, envelopes, balances, total, standard, setStandard, metric, setMetric, selected, setSelected, bauhaus, fund }) {
+  const renovation = fund.renovations.find((r) => r.index === selected)
   const b = selected != null ? data.buildings[selected] : null
   const env = selected != null ? envelopes[selected] : null
   const bal = selected != null ? balances[selected] : total
@@ -119,6 +172,8 @@ export function EnergyPanel({ data, envelopes, balances, total, standard, setSta
         <span>Insulation</span>
         <Choice options={STANDARDS} value={standard} onChange={setStandard} />
       </div>
+
+      <Fund fund={fund} />
 
       <div className="subject">
         <h2>
@@ -140,6 +195,12 @@ export function EnergyPanel({ data, envelopes, balances, total, standard, setSta
         <>
           <table className="facts">
             <tbody>
+              {renovation && (
+                <tr>
+                  <td>Renovated by the fund</td>
+                  <td>new build: {renovation.reason}</td>
+                </tr>
+              )}
               <tr>
                 <td>Heat demand</td>
                 <td>
@@ -203,8 +264,14 @@ export function EnergyPanel({ data, envelopes, balances, total, standard, setSta
           {MIN_HEATED_HEIGHT_M} m are taken as unheated.
         </p>
         <p>
+          <strong>The fund</strong> gets the clicked building and the ten heated, unrenovated buildings that
+          need the most heating per season. The app works out what each would save if renovated (heating now minus
+          heating at the new-build standard), and estimates its residents by sharing each census cell's population
+          over the residential floor area in it. A language model decides; it may only pick from that list.
+        </p>
+        <p>
           <strong>Limits</strong>: the kit has no construction year or insulation, so every building gets the same
-          standard; roofs are taken as flat at the building's highest point, so volume is too high for pitched
+          standard, except those the fund renovated; roofs are taken as flat at the building's highest point, so volume is too high for pitched
           roofs; every use is heated like housing; no shading by neighbours; no heating system losses. Read the
           figures as a comparison between forms, not as the real consumption of a building.
         </p>
@@ -234,6 +301,10 @@ export function EnergyLegend({ metric }) {
         <li>
           <span className="swatch" style={{ background: SELECTED_COLOR }} />
           selected building
+        </li>
+        <li>
+          <span className="swatch outline" style={{ borderColor: RENOVATED_COLOR }} />
+          renovated by the fund (new build)
         </li>
       </ul>
     </>

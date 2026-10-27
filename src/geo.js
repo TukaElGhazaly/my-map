@@ -56,6 +56,7 @@ export function prepareBuildings(geojson, project) {
       use: f.properties.use ?? 'undefined',
       floors: f.properties.floors,
       floorArea: Object.values(f.properties.floor_area_m2 ?? {}).reduce((s, v) => s + v, 0),
+      homeArea: f.properties.floor_area_m2?.residential ?? 0, // residential floor area
       rings,
       bbox: bboxOf(rings),
     }

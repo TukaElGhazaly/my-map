@@ -2,7 +2,7 @@
 
 How far can you walk from any point in central Weimar, and who lives there?
 
-The app shows the city kit in 3D: the area from the Bauhaus main building in the south to Weimar station in the north, every building extruded to its measured height, on a pale ground with the pedestrian network drawn thin. A switch at the top of the panel chooses between two views.
+The app shows the city kit in 3D: the area from the Bauhaus main building in the south to Weimar station in the north, every building extruded to its measured height, on a pale ground with the pedestrian network drawn thin. A switch at the top of the panel chooses between the views.
 
 **Walking reach.** Buildings are coloured by their main use. Click on the ground and it walks from the nearest street node for 5, 10 and 15 minutes. It shows the three areas you reach in three shades of orange, highlights the buildings that touch each area in the matching shade, and counts the buildings and the residents in each area.
 
@@ -11,6 +11,8 @@ The app shows the city kit in 3D: the area from the Bauhaus main building in the
 **Heat.** Where does the city get hot on a summer afternoon, and where does greenery cool it? A model on a grid of 4 m squares, along the transect from the Bauhaus main building to the station (the black line, with a profile chart in the panel). Layers: surface temperature, evaporative cooling (latent heat flux in W/m²), albedo, sky view factor, night-time heat retention, mean radiant temperature (Tmrt), and hotspots with cooling buffers. A switch sets the time: 11:00, 15:00 or 18:00. Click any spot to see its energy balance.
 
 **Topology.** How is the city connected, rather than how far apart are things? Layers: street integration and choice (space syntax angular segment analysis, for the whole network or within 800 m), junctions by the number of ways that meet, buildings joined by party walls, blocks and enclosed courtyards, networks of green and blue spaces (joined across gaps of 10 to 100 m), and street canyons (wall height ÷ street width). A table compares the corridor 200 m on each side of the transect with the whole kit. Click a street, a building or the ground for details.
+
+**Thinking roof.** My design for the plot west of the Markt, two houses with a street between them, from Rhino and Grasshopper (`public/data/design.glb`). Its two roofs are divided into 40 sections (`public/data/roof.json`). The roof thinks: it wants to keep the building warm and asks you for plants. Plant, remove plants, put benches, or draw a planting area or a path on the roof. A season clock runs (one real minute is one month, a day passes in 24 seconds). The roof comments on your changes, reconsiders when the season turns, checks once a minute where it loses most, and acts by itself when the heat flow passes a limit. It grows plants, refuses some of your changes, and can decide two things that can't be undone: plant a section for good, and switch the building to passive mode, with the heating off for good. A heat overlay shows where heat escapes (red) and where it's held in (blue); windows glow warm or cold, and a bar above each house shows its top floor's heating.
 
 ## Run it
 
@@ -94,6 +96,16 @@ Everything in this view is measured from the kit; only the thresholds below are 
 
 **Limits.** The kit ends at its edge, so streets near the edge look less integrated than they are. The network is drawn for walking (with crossings over squares), not a classic axial map, so values are not directly comparable with published space syntax studies. The kit has no trees or tree lines, so green networks miss private gardens and street trees. A courtyard reached through a gateway in a building counts as enclosed. Heights are to the highest point of the roof, so canyons with pitched roofs look a little deeper than they are.
 
+## Method and its limits: thinking roof
+
+- **Heat flow through a roof section** = U-value × area × (20 °C inside − roof surface temperature). The insulated roof has U = 0.25 W/m²K; thin planting adds 0.4 m²K/W, dense planting 1.2. The surface is the air temperature, plus the sun it takes in (bare 85%, thin 35%, dense 15%, at 20 W/m²K to the air), minus night-sky cooling (bare 4 K, thin 2 K, dense 0.5 K). North-facing sections lose 25% more, corners 20% more, south-facing 10% less.
+- **Season.** While the month's mean temperature is below 12 °C (October to April), heat leaving the flats counts. Otherwise heat getting in counts, once the surface is above 25 °C. Climate: rounded monthly means, day-night swing, noon sunshine and day length for Weimar.
+- **Top floor.** Roof plus facade (1.6 W/K per metre of facade, 3 m high) minus 4 W/m² from people and appliances.
+- **Time.** One real minute is one month, starting this month; a day passes in 24 seconds, as a sample of the month. Energy saved is counted against a bare roof at the month's pace. The effect of a change is its average over a whole day of that month.
+- **The roof** is a language model (Claude Haiku, through `claude -p` on my laptop, from `roof-server.js`; only with `npm run dev`). It gets the clock, the weather and every section's figures and decides; the app checks that it only grows or locks free sections, and only switches to passive mode once 60% of the roof is green. It is asked first when you remove plants from the north side or a corner in winter, or plant over benches or a path.
+
+**Limits.** Rounded climate, no snow, rain or wind speed, a steady 20 °C inside, no heat stored in the building. The roof sections follow my Grasshopper definition on 27 October 2026; a change there needs a new export. Read the figures as a comparison between roofs, not as a prediction.
+
 ## Data sources
 
 All data comes from `public/data/`; the app fetches nothing from the internet. See `public/data/SOURCES.md`.
@@ -104,6 +116,7 @@ All data comes from `public/data/`; the app fetches nothing from the internet. S
 | Land use per plot | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
 | Pedestrian network | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
 | Census grid | Zensus 2022, 100 m grid, © Statistische Ämter des Bundes und der Länder | dl-de/by-2-0 |
+| My design and its roof sections (`design.glb`, `roof.json`) | exported from my Rhino and Grasshopper model | |
 
 Attribution, as shown on the map:
 
@@ -113,5 +126,5 @@ Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedest
 
 1. Tools: Claude Code, with Claude Opus 5.5.
 2. I decided:
-3. The agent did: read the city kit, wrote the 3D view, the walking, band and resident calculations, the energy balance and flow diagram, the surface heat model, the topology analysis, the panels and this README, and tested them.
+3. The agent did: read the city kit, wrote the 3D view, the walking, band and resident calculations, the energy balance and flow diagram, the surface heat model, the topology analysis, the thinking roof (export from Grasshopper, heat model, endpoint), the panels and this README, and tested them.
 4. I checked:

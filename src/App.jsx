@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import City, { ReachAreas, StartMarker, GroundImage, GroundLine, StreetRibbons, NodeDots, LinkLines } from './City.jsx'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import City, { ReachAreas, StartMarker, GroundImage, GroundLine, StreetRibbons, NodeDots, LinkLines, Renovated } from './City.jsx'
 import { loadKit, makeProjection, prepareBuildings, prepareCells, preparePlots } from './geo.js'
 import { buildGrid, heatAt, summary, transect, roofTemperatures, cellAt, CELL_M } from './heat.js'
 import { HeatPanel, HeatLegend, heatImage, heatBuildingColors } from './HeatPanel.jsx'
@@ -7,11 +7,15 @@ import { prepareNetwork, computeReach } from './reach.js'
 import { measureEnvelopes, heatBalance, sumBalances } from './energy.js'
 import { WalkPanel, WalkLegend, walkColors } from './WalkPanel.jsx'
 import { EnergyPanel, EnergyLegend, energyColors } from './EnergyPanel.jsx'
+import { useFund } from './fund.js'
 import { greenNetworks, GAPS, CORRIDOR_M } from './topology.js'
 import {
   TopologyPanel, TopologyLegend, computeTopology, streetStyle, nodeColors, topologyBuildingColors, topologyImage,
   topologyLines, topologyPick,
 } from './TopologyPanel.jsx'
+import { useRoof, loadRoof, sectionsInArea, sectionsOnPath } from './roof.js'
+import { RoofScene } from './RoofScene.jsx'
+import { RoofPanel, RoofLegend, TOOLS, isDrawTool, roofGlow } from './RoofPanel.jsx'
 
 const ATTRIBUTION =
   'Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0).'
@@ -19,12 +23,13 @@ const ATTRIBUTION =
 const BAUHAUS_ID = '14780' // the Bauhaus-Universität main building, Geschwister-Scholl-Straße 8
 const STATION = [11.3265, 50.9912] // Weimar Hauptbahnhof, at the north edge of the kit
 
-const VIEWS = { walk: 'Walking reach', energy: 'Energy', heat: 'Heat', topology: 'Topology' }
+const VIEWS = { walk: 'Walking reach', energy: 'Energy', heat: 'Heat', topology: 'Topology', roof: 'Thinking roof' }
 const TITLES = {
   walk: 'How far can you walk?',
   energy: 'Where does the heat go?',
   heat: 'Where does the city get hot?',
   topology: 'How is the city connected?',
+  roof: 'What does the roof want?',
 }
 
 export default function App() {
@@ -49,6 +54,11 @@ export default function App() {
   const [radius, setRadius] = useState('r800')
   const [gap, setGap] = useState('g30')
   const [topoPick, setTopoPick] = useState(null)
+  // thinking roof
+  const [roof, setRoof] = useState(null)
+  const [tool, setTool] = useState('plant')
+  const [drawing, setDrawing] = useState([])
+  const [overlay, setOverlay] = useState(false)
 
   useEffect(() => {
     loadKit()
@@ -83,10 +93,34 @@ export default function App() {
       .catch((e) => setError(e.message))
   }, [])
 
-  const balances = useMemo(
-    () => data && data.buildings.map((b, i) => heatBalance(b, data.envelopes[i], standard)),
-    [data, standard],
-  )
+  // The thinking roof: its sections are loaded the first time the view opens; it remembers everything after.
+  useEffect(() => {
+    if (view !== 'roof' || roof) return
+    loadRoof().then(setRoof).catch((e) => setError(e.message))
+  }, [view, roof])
+  const roofState = useRoof(roof, view === 'roof')
+  const glow = useMemo(() => roofState.now && roofGlow(roofState.now, roofState.clock), [roofState.now, roofState.clock])
+  const chooseTool = (t) => {
+    setTool(t)
+    setDrawing([])
+  }
+  const onSection = (id, [x, y], z) => {
+    if (isDrawTool(tool)) setDrawing((d) => [...d, [x, y, z]])
+    else roofState.change(tool, [id], TOOLS[tool].toLowerCase())
+  }
+  const finishDrawing = () => {
+    const ids = tool === 'area' ? sectionsInArea(roof, drawing) : sectionsOnPath(roof, drawing)
+    roofState.change(tool, ids, tool === 'area' ? 'drew a planting area' : 'drew a path')
+    setDrawing([])
+  }
+
+  // The renovation fund. Buildings it renovated stay at the new-build standard, whatever the switch says.
+  const fund = useFund(data, standard, view === 'energy')
+  const balances = useMemo(() => {
+    if (!data) return null
+    const renovated = new Set(fund.renovations.map((r) => r.index))
+    return data.buildings.map((b, i) => heatBalance(b, data.envelopes[i], renovated.has(i) ? 'new' : standard))
+  }, [data, standard, fund.renovations])
   const total = useMemo(() => {
     if (!data) return null
     const t = sumBalances(balances)
@@ -132,15 +166,17 @@ export default function App() {
 
   const colors = useMemo(() => {
     if (!data) return []
-    if (view === 'walk') return walkColors(data.buildings, reach)
+    if (view === 'walk' || view === 'roof') return walkColors(data.buildings, view === 'walk' ? reach : null)
     if (view === 'energy') return energyColors(data.buildings, data.envelopes, balances, metric, selected)
     if (view === 'topology') return topo ? topologyBuildingColors(data.buildings, topo, topoLayer, topoPick) : walkColors(data.buildings, null)
     return roofTs ? heatBuildingColors(data.buildings, roofTs, layer) : walkColors(data.buildings, null)
   }, [data, view, reach, balances, metric, selected, roofTs, layer, topo, topoLayer, topoPick])
 
   const pick = (x, y, building) => {
+    if (view === 'roof') return // the roof listens to clicks on its own sections
     if (view === 'energy') {
       setSelected(building)
+      if (building != null) fund.think(building)
       return
     }
     if (view === 'heat') {
@@ -168,6 +204,12 @@ export default function App() {
       <City data={data} colors={colors} landmarks={data.landmarks} onPick={pick}>
         {view === 'walk' && reach?.levels && <ReachAreas levels={reach.levels} />}
         {view === 'walk' && reach?.start && <StartMarker start={reach.start} />}
+        {view === 'roof' && roof && roofState.now && (
+          <Suspense fallback={null}>
+            <RoofScene roof={roof} roofState={roofState} overlay={overlay} onSection={onSection} drawing={drawing} glow={glow} lastSay={roofState.log.find((e) => e.say)?.say} />
+          </Suspense>
+        )}
+        {view === 'energy' && <Renovated buildings={data.buildings} renovations={fund.renovations} />}
         {view === 'heat' && image && <GroundImage grid={grid} rgba={image} cell={CELL_M} />}
         {view === 'heat' && <GroundLine from={bauhausPoint} to={stationPoint} />}
         {view === 'topology' && topoImage && <GroundImage grid={grid} rgba={topoImage} cell={CELL_M} />}
@@ -189,6 +231,22 @@ export default function App() {
         </div>
         <h1>{TITLES[view]}</h1>
         {view === 'walk' && <WalkPanel reach={reach} busy={busy} />}
+        {view === 'roof' &&
+          (roofState.now ? (
+            <RoofPanel
+              roof={roof}
+              roofState={roofState}
+              tool={tool}
+              setTool={chooseTool}
+              drawing={drawing}
+              finishDrawing={finishDrawing}
+              cancelDrawing={() => setDrawing([])}
+              overlay={overlay}
+              setOverlay={setOverlay}
+            />
+          ) : (
+            <p className="hint">Loading the roof…</p>
+          ))}
         {view === 'heat' && (
           <HeatPanel
             grid={grid}
@@ -230,12 +288,14 @@ export default function App() {
             selected={selected}
             setSelected={setSelected}
             bauhaus={data.bauhaus}
+            fund={fund}
           />
         )}
       </aside>
 
       <aside className="legend">
         {view === 'walk' && <WalkLegend uses={data.uses} />}
+        {view === 'roof' && roofState.now && <RoofLegend overlay={overlay} now={roofState.now} clock={roofState.clock} />}
         {view === 'energy' && <EnergyLegend metric={metric} />}
         {view === 'heat' && <HeatLegend layer={layer} />}
         {view === 'topology' && <TopologyLegend layer={topoLayer} />}

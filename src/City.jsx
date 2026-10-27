@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { REACH_COLORS, GROUND_COLOR, BACKGROUND_COLOR, STREET_COLOR } from './colors.js'
+import { REACH_COLORS, GROUND_COLOR, BACKGROUND_COLOR, STREET_COLOR, RENOVATED_COLOR } from './colors.js'
 
 // Map metres (x east, y north) to the 3D scene (x east, y up, -z north).
 const toScene = (x, y, h = 0) => [x, h, -y]
@@ -253,7 +253,7 @@ export function LinkLines({ lines, color = '#1c1c1c' }) {
 }
 
 // A text label drawn into a small image that always faces the camera and keeps its size on screen.
-function Label({ text, position }) {
+function Label({ text, position, color = '#2b2b2b' }) {
   const { texture, aspect } = useMemo(() => {
     const scale = 3
     const canvas = document.createElement('canvas')
@@ -264,7 +264,7 @@ function Label({ text, position }) {
     const h = 22 * scale
     canvas.width = w
     canvas.height = h
-    ctx.fillStyle = '#2b2b2b'
+    ctx.fillStyle = color
     ctx.beginPath()
     ctx.roundRect(0, 0, w, h, 5 * scale)
     ctx.fill()
@@ -275,13 +275,48 @@ function Label({ text, position }) {
     const t = new THREE.CanvasTexture(canvas)
     t.colorSpace = THREE.SRGBColorSpace
     return { texture: t, aspect: w / h }
-  }, [text])
+  }, [text, color])
   useEffect(() => () => texture.dispose(), [texture])
   const size = 0.024 // height on screen, as a share of the view
   return (
     <sprite position={position} scale={[size * aspect, size, 1]} center={[0.5, 0]} renderOrder={10} raycast={() => null}>
       <spriteMaterial map={texture} sizeAttenuation={false} depthTest={false} transparent />
     </sprite>
+  )
+}
+
+// Buildings the renovation fund renovated: a dark outline along the roof and the corners,
+// and a label with the fund's reason.
+export function Renovated({ buildings, renovations }) {
+  const geometry = useMemo(() => {
+    const pos = []
+    for (const { index } of renovations) {
+      const b = buildings[index]
+      const h = b.height + 0.3
+      for (const ring of b.rings)
+        ring.forEach((p, k) => {
+          const q = ring[(k + 1) % ring.length]
+          pos.push(...toScene(p[0], p[1], h), ...toScene(q[0], q[1], h))
+          pos.push(...toScene(p[0], p[1], 0.3), ...toScene(p[0], p[1], h))
+        })
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    return g
+  }, [buildings, renovations])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  return (
+    <>
+      <lineSegments geometry={geometry} raycast={() => null}>
+        <lineBasicMaterial color={RENOVATED_COLOR} />
+      </lineSegments>
+      {renovations.map(({ index, label }) => {
+        const b = buildings[index]
+        const [x, y] = b.rings[0].reduce(([sx, sy], p) => [sx + p[0] / b.rings[0].length, sy + p[1] / b.rings[0].length], [0, 0])
+        const text = `Renovated: ${label || 'by the fund'}`
+        return <Label key={index} text={text.length > 48 ? text.slice(0, 47) + '…' : text} position={toScene(x, y, b.height + 4)} color={RENOVATED_COLOR} />
+      })}
+    </>
   )
 }
 
